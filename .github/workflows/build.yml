@@ -102,6 +102,29 @@ jobs:
             fi
           fi
 
+      - name: Bundle uBlock Origin
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          META=$(curl -fsSL https://addons.mozilla.org/api/v5/addons/addon/ublock-origin/)
+          XPI_URL=$(echo "$META" | jq -r '.current_version.file.url')
+          UBLOCK_VERSION=$(echo "$META" | jq -r '.current_version.version')
+          test -n "$XPI_URL" && test "$XPI_URL" != "null"
+          curl -fsSL "$XPI_URL" -o /tmp/ublock.xpi
+          test -s /tmp/ublock.xpi
+          rm -rf app/src/main/assets/extensions/ublock
+          mkdir -p app/src/main/assets/extensions/ublock
+          unzip -q /tmp/ublock.xpi -d app/src/main/assets/extensions/ublock
+          # Xoa chu ky (dung nhu extension built-in)
+          rm -rf app/src/main/assets/extensions/ublock/META-INF
+          test -f app/src/main/assets/extensions/ublock/manifest.json
+          GECKO_ID=$(jq -r '.browser_specific_settings.gecko.id' app/src/main/assets/extensions/ublock/manifest.json)
+          if [ "$GECKO_ID" != "uBlock0@raymondhill.net" ]; then
+            echo "::error::Gecko ID khong khop: $GECKO_ID"
+            exit 1
+          fi
+          echo "Da goi uBlock Origin phien ban $UBLOCK_VERSION (id=$GECKO_ID)"
+
       - name: Run Unit Tests
         working-directory: ${{ env.PROJECT_DIR }}
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
